@@ -6,7 +6,18 @@ def integerCubeRootHelper(n, left, right):
     assert(right < n)
     assert(cube(left) < n), f'{left}, {right}'
     assert(cube(right) > n), f'{left}, {right}'
-    # your code here
+
+    print(f"Pointers: L:{left}, R:{right}")
+    mid = (left + right) // 2
+    print(f"N: {n}, Mid: {mid}, Cube:{cube(mid)}")
+
+    if cube(mid) <= n and cube(mid + 1) > n:
+        print(f"Solved: n = {mid}\n")
+        return mid
+    elif cube(mid) > n:
+        return integerCubeRootHelper(n, left=left, right=mid)
+    else:
+        return integerCubeRootHelper(n, left=mid, right=right)
     
 # Write down the main function
 def integerCubeRoot(n):
@@ -25,7 +36,7 @@ assert(integerCubeRoot(8) == 2)
 assert(integerCubeRoot(20) == 2)
 assert(integerCubeRoot(26) == 2)
 for j in range(27, 64):
-    assert(integerCubeRoot(j) == 3)
+     assert(integerCubeRoot(j) == 3)
 for j in range(64,125):
     assert(integerCubeRoot(j) == 4)
 for j in range(125, 216):
