@@ -3,7 +3,25 @@ def twoWayMerge(lst1, lst2):
     #          two ascending order sorted lists
     # return a fresh ascending order sorted list that 
     #          merges lst1 and lst2
-    # your code here
+    temp_store = []
+    i = 0
+    j = 0
+    while ( i <= len(lst1) - 1 and j <= len(lst2) - 1):
+        if lst1[i] < lst2[j]:
+            temp_store.append(lst1[i])
+            i += 1
+        else:
+            temp_store.append(lst2[j])
+            j += 1
+    if i > len(lst1) - 1:
+        while j <= len(lst2) - 1:
+            temp_store.append(lst2[j])
+            j += 1
+    if j > len(lst2) - 1:
+        while i <= len(lst1) - 1:
+            temp_store.append(lst1[i])
+            i += 1
+    return temp_store
 
 # given a list_of_lists as input, 
 #   if list_of_lists has 2 or more lists, 
