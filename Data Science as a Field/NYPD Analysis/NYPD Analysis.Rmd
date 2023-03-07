@@ -1,0 +1,122 @@
+---
+title: "Project 1 - NYPD Analysis"
+author: "Ian Thulin"
+date: "2023-03-01"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r data folder creation, echo=FALSE}
+if(!file.exists("Data")){dir.create("Data")}
+```
+
+```{r data import, echo=FALSE, include=FALSE}
+NYPD_data <- read.csv("https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD", 
+                      na.strings = ".")
+```
+----
+
+After importing the data, we will begin the data cleaning or "tidying" stage of our project. Initially we will explore the data set to understand what information we will use in our analysis and what we can remove. In my case I have decided that the Date and Time records have not been recorded in a method that will allow further study, so I had to go through the process of formatting each column of the data set into the proper date/time type. I also decided to remove the columns related to the incident, key, jurisdiction code, location description, x coordinate, and y coordinates.
+
+----
+```{r tidy the dataframe, warning=FALSE, include=FALSE}
+# Concatenate the strings for OCCUR_TIME and OCCUR_DATE
+library(lubridate)
+#NYPD_data$OCCUR_DATE <- paste(NYPD_data$OCCUR_DATE, NYPD_data$OCCUR_TIME, sep = " ")
+```
+
+```{r format dates, warning=FALSE}
+# Adjust the formatting for the OCCUR_DATE column and remove unneccesary columns of data
+NYPD_data$OCCUR_DATE <- mdy(NYPD_data$OCCUR_DATE)
+NYPD_data$OCCUR_DATE <- format(as.Date(NYPD_data$OCCUR_DATE), "%Y")
+NYPD_data <- subset(NYPD_data, select = -c(INCIDENT_KEY, JURISDICTION_CODE, OCCUR_TIME, LOCATION_DESC, X_COORD_CD, Y_COORD_CD))
+NYPD_data$VIC_SEX[NYPD_data$VIC_SEX == "M"] <- 1
+NYPD_data$VIC_SEX[NYPD_data$VIC_SEX == "F"] <- 0
+NYPD_data$VIC_SEX <- as.integer(NYPD_data$VIC_SEX)
+NYPD_data$num <- 1:nrow(NYPD_data)
+```
+----
+
+In order to more effectively map the different boroughs we need to separate our data frame into subframes associated with each Borough of New York.
+
+----
+```{r seperate boros, warning=FALSE}
+# Create a new data frame for each Boro to allow for graphing in seperate colors
+NYPD_data_Bronx <- NYPD_data[NYPD_data$BORO == 'BRONX',]
+NYPD_data_Brooklyn <- NYPD_data[NYPD_data$BORO == 'BROOKLYN',]
+NYPD_data_Manhattan <- NYPD_data[NYPD_data$BORO == 'MANHATTAN',]
+NYPD_data_Queens <- NYPD_data[NYPD_data$BORO == 'QUEENS',]
+NYPD_data_Staten_Island <- NYPD_data[NYPD_data$BORO == 'STATEN ISLAND',]
+```
+
+```{r get google api, echo=FALSE, include=FALSE, warning=FALSE}
+ggmap::register_google(key="AIzaSyCebrZuLe2CJmtv8-yct8A7mGaYook8HcM")
+```
+----
+
+In this next code block we will set the boundary for the mapping region, then plot each Borough in it's own color as an overlay filter for the Google Map we previously Obtained.
+
+----
+```{r alternate map, echo=FALSE, warning=FALSE, message=FALSE}
+library("ggmap")
+bound <- c(
+  left = min(NYPD_data$Longitude) - 0.05, bottom = min(NYPD_data$Latitude) - 0.05,
+  right = max(NYPD_data$Longitude) + 0.05, top = max(NYPD_data$Latitude) + 0.05
+)
+
+ny_map <- get_map(bound, zoom=11, maptype = "toner")
+ggmap(ny_map) + 
+  geom_point(data = NYPD_data_Brooklyn,aes(x=Longitude,y = Latitude),alpha=.5,color='purple',size=.5) + 
+  geom_point(data = NYPD_data_Bronx,aes(x=Longitude,y = Latitude),alpha=.5,color='orange',size=.5) + 
+  geom_point(data = NYPD_data_Manhattan,aes(x=Longitude,y = Latitude),alpha=.5,color='red',size=.5) + 
+  geom_point(data = NYPD_data_Queens,aes(x=Longitude,y = Latitude),alpha=.5,color='blue',size=.5) + 
+  geom_point(data = NYPD_data_Staten_Island,aes(x=Longitude,y = Latitude),alpha=.5,color='green',size=.5) + 
+  labs(title = "Shooting Incidents as reported to NYPD",
+       subtitle="6/1/2006 - 11/11/2021, https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD",
+       x = "Longitude",
+       y = "Latitude",
+       color= "Boroughs")
+```
+----
+
+  Finally we are left with the above plot. The location of each incident included in our data set has been plotted on the google map overlay by utilizing the latitude and longitude of the data point. AS we can see there are several area on the map that have a higher density of incidents than their surrounding neighborhoods. This may be reflective of the overall crime rate throughout different areas of the city, but ultimatly is probably quite muddled by the numerous confounding variables that our data most likely has. 
+  
+  One of the most pressing confounding variables is the fact that all of the data points in this data set come from reported crimes that occured after a victim had already been discovered. It is possible that the victims of these incidents had been moved from the scene of the crime in order to hide the actual location of the crime. Additionally I would expect some areas of the city to have a higher rate of patrol activity which may act to further deter the activities of many criminal elements. 
+  
+----
+```{r plot 1, echo=FALSE, warning=FALSE}
+# plot
+ggplot(data = NYPD_data, aes(x=BORO, y=VIC_SEX, fill=VIC_SEX)) +
+  geom_point(stat = "summary", fun = mean, size=5) +
+  labs(title = "Correlatation between male and female victims in different Boroughs") +
+  ylab("Percent of victims who are male") +
+  xlab("Borough of New York City")
+```
+----
+
+A second point of interest for this data set was to look at how skewed the proportion of male to female victims is. I believe most people would not bbe surprised to learn that men are significantly more likely to die to aggressive circumstances. In particular I was aware that the vast majority of gun violence victims were male, regardless of if the gun was used on oneself or on a different individual. For this analysis I looked at two seperate charte. On the 1st chart we graphed the percentage of male victims against the Borough in which the victim was killed. I was curious if different districs in the city hade a significant skew towards victims of a particular sex. Overall the vast majority, more than 88% in all boroughs, of victims were male with the most victims being found in the Bronx. While the overall percentage was only 2% higher, the Bronx data point was noticeably higher than the other Boroughs. I would be curious to gather some socio-economic data about the residents of each bough in order to determine if the difference in percent male victims is tied to lower income areas of the city. 
+
+The second plot sought was created in order to examine the changed in the percent of male victims over subsequent years. Overall the mean percentage of male victims is consistent with our previous graph, showing a difference of roughly 2% between the highlest and lowest points of our data set. It does apear that while the pattern is somewhat cyclical there has been an overall downward trend in male victims as time goes on. This could be an interesting point to explore the relationship between changing levels of gang-related crime incidents and the proportion of male victims of gun related crimes.
+
+----
+```{r plot 2, echo=FALSE, warning=FALSE}
+# plot
+ggplot(data = NYPD_data, aes(x=OCCUR_DATE, y=VIC_SEX, fill=VIC_SEX)) +
+  geom_point(stat = "summary", fun  = mean, size=5) +
+  labs(title = "Correlatation between male and female victims in different Boroughs") +
+  ylab("Percent of victims who are male") +
+  xlab("Borough of New York City")
+```
+----
+
+D. Kahle and H. Wickham. ggmap: Spatial Visualization with ggplot2. The R Journal, 5(1), 144-161. URL
+http://journal.r-project.org/archive/2013-1/kahle-wickham.pdf
+
+----
+```{r source info, echo=FALSE}
+sessionInfo()
+```

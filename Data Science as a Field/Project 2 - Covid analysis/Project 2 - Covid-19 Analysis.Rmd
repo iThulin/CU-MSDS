@@ -1,0 +1,190 @@
+---
+title: "Project 2 - Covid-19 Analysis"
+author: "Ian Thulin"
+date: "2023-03-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r url setup, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(ggmap)
+library(tidyr)
+library(lubridate)
+url_in <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
+
+file_names <- c("time_series_covid19_confirmed_US.csv",
+                "time_series_covid19_confirmed_global.csv",
+                "time_series_covid19_deaths_US.csv",
+                "time_series_covid19_deaths_global.csv")
+
+urls <- str_c(url_in, file_names)
+```
+
+```{r import data, message=FALSE}
+global_cases <- read_csv(urls[1])
+global_deaths <- read_csv(urls[2])
+US_cases <- read_csv(urls[3])
+US_deaths <- read_csv(urls[4])
+```
+
+```{r adjust global cases, warning=FALSE}
+library(tidyr)
+global_cases <- global_cases[,-1:-6]
+global_cases <- global_cases[,-5]
+US_cases <- US_cases[, -1: -6]
+US_cases <- US_cases[, -5]
+
+```
+----
+
+After importing the data sets several modifications were made to each data set. In particular the format in which the date information was presented was unusable, so each graph had to undergo a pivot_longer operation in order to format the information. Severall columns were also removed since I only needed the latitude, longitude, date, and case columns for the analysis that I had planned. The date information also had to be formatted so that ggplot2 would recognize the information as dates and not simple stings.
+
+----
+```{r trim cols, warning=FALSE}
+
+global_cases <- global_cases %>%
+  pivot_longer(cols = -c('Province_State', 'Country_Region',
+                         'Lat', 'Long_',), 
+                names_to = "date",
+                values_to = "cases")
+global_deaths <- global_deaths %>%
+  pivot_longer(cols = -c('Province/State', 'Country/Region',
+                         'Lat', 'Long'),
+               names_to = "date",
+               values_to = "cases")
+US_cases  <- US_cases %>%
+  pivot_longer(cols = -c('Province_State', 'Country_Region',
+                         'Lat', 'Long_'),
+               names_to = "date",
+               values_to = "cases")
+US_deaths <- US_deaths %>%
+  pivot_longer(cols = -c('Province/State', 'Country/Region', 
+                         'Lat', 'Long'),
+               names_to = "date",
+               values_to = "cases")
+```
+
+```{r format date , warning=FALSE}
+
+US_cases$date <- mdy(US_cases$date)
+global_cases$date <- mdy(global_cases$date)
+US_deaths$date <- mdy(US_deaths$date)
+global_deaths$date <- mdy(global_deaths$date)
+```
+
+```{r get google api, echo=FALSE, include=FALSE, warning=FALSE}
+ggmap::register_google(key="AIzaSyCebrZuLe2CJmtv8-yct8A7mGaYook8HcM")
+```
+
+When I originally tried to plot the latitude and longitude data four the four data sets in this project, I had numerous issues with outliers effecting the plots I had created. In order to fix this I used a technique to remove the outlier datapoints from my samp[le size. Please see https://cran.r-project.org/web/packages/ggmap/readme/README.html for more information on where these formula's came from.
+
+```{r US cases outliers, warning=FALSE}
+Q_US_cases <- quantile(US_cases$cases, probs = c(.25, .75), na.rm = FALSE)
+iqr_US_cases <- IQR(US_cases$cases)
+up_US_cases <- Q_US_cases[2]+1.5*iqr_US_cases #Upper Range
+low_US_cases <- Q_US_cases[1]-1.5*iqr_US_cases # Lower Range
+US_cases_eliminated <- subset(US_cases, US_cases$cases > (Q_US_cases[1] - 1.5*iqr_US_cases) & US_cases$cases < (Q_US_cases[2]+1.5*iqr_US_cases))
+```
+
+```{r global cases outlier, warning=FALSE}
+Q_global_cases <- quantile(global_cases$cases, probs = c(.25, .75), na.rm = FALSE)
+iqr_global_cases <- IQR(global_cases$cases)
+up_global_cases <- Q_global_cases[2]+1.5*iqr_global_cases #Upper Range
+low_global_cases <- Q_global_cases[1]-1.5*iqr_global_cases # Lower Range
+global_cases_eliminated <- subset(global_cases, global_cases$cases > (Q_global_cases[1] - 1.5*iqr_global_cases) & global_cases$cases < (Q_global_cases[2]+1.5*iqr_global_cases))
+```
+
+```{r US deaths outliers, warning=FALSE}
+Q_US_deaths <- quantile(US_deaths$cases, probs = c(.25, .75), na.rm = FALSE)
+iqr_US_deaths <- IQR(US_deaths$cases)
+up_US_deaths <- Q_US_deaths[2]+1.5*iqr_US_deaths #Upper Range
+low_US_deaths <- Q_US_deaths[1]-1.5*iqr_US_deaths # Lower Range
+US_deaths_eliminated <- subset(US_deaths, US_deaths$cases > (Q_US_deaths[1] - 1.5*iqr_US_deaths) & US_deaths$cases < (Q_US_deaths[2]+1.5*iqr_US_deaths))
+```
+
+```{r global deaths outliers, warning=FALSE}
+Q_global_deaths <- quantile(global_deaths$cases, probs = c(.25, .75), na.rm = FALSE)
+iqr_global_deaths <- IQR(global_deaths$cases)
+up_global_deaths <- Q_global_deaths[2]+1.5*iqr_global_deaths #Upper Range
+low_global_deaths <- Q_global_deaths[1]-1.5*iqr_global_deaths # Lower Range
+global_deaths_eliminated <- subset(global_deaths, global_deaths$cases > (Q_global_deaths[1] - 1.5*iqr_global_deaths) & global_deaths$cases < (Q_global_deaths[2]+1.5*iqr_global_deaths))
+```
+----
+
+The following section shows the plots for number of cases or deaths per day over the course of the entire data set for this project. I was experimenting with a heat map visualization to show the time series progression of the pandemic, but I could not get the plot to work in the amount of time allotted for this project. Overall This plot is not particularly useful, the density of the individual plots is too great and results in an essentially uniform color gradient with no distinguishable information. If I had more time I would look into trying to subset the data sets to show either the monthly progression or the only show the plot for one state at a Time. These would allow for more use to be obtained from the otherwise lackluster plots I have created for this assignment.
+
+----
+```{r plot US cases, warning=FALSE}
+ggplot(US_cases_eliminated, aes(x=date, y=cases, color=US_cases_eliminated$cases)) +
+  geom_point()
+```
+
+```{r plot global cases, warning=FALSE}
+ggplot(global_cases_eliminated, aes(x=date, y=cases, color=global_cases_eliminated$cases)) +
+  geom_point()
+```
+
+```{r plot US deaths, warning=FALSE}
+ggplot(US_deaths_eliminated, aes(x=date, y=cases, color=US_deaths_eliminated$cases)) +
+  geom_point()
+```
+
+```{r plot global deaths, warning=FALSE}
+ggplot(global_deaths_eliminated, aes(x=date, y=cases, color=global_deaths_eliminated$cases)) +
+  geom_point()
+```
+
+----
+
+```{r basic US map, warning=FALSE}
+base_map_us <- get_map("United States", zoom = 4, maptype = "hybrid")
+ggmap(base_map_us) + 
+  geom_point(data = US_cases_eliminated,
+             aes(x=Long_, y=Lat, color=cases), 
+             size = .02, alpha = .5) + 
+  scale_color_gradient(low = "green", high = "red")
+
+```
+
+```{r basic earth map, warning=FALSE}
+base_map_earth <- get_map("Congo", zoom = 1, maptype = "hybrid")
+ggmap(base_map_earth) + 
+  geom_point(data = global_cases_eliminated,
+             aes(x=Long_, y=Lat, color=cases), 
+             size = .01, alpha = .5) + 
+  scale_color_gradient(low = "green", high = "red")
+
+```
+
+```{r basic US death map, warning=FALSE}
+base_map_us_death <- get_map("United States", zoom = 4, maptype = "hybrid")
+ggmap(base_map_us_death) + 
+  geom_point(data = US_deaths_eliminated,
+             aes(x=Long, y=Lat, color=cases), 
+             size = .01, alpha = .5) + 
+  scale_color_gradient(low = "red", high = "black")
+
+```
+
+```{r basic earth death map, warning=FALSE}
+base_map_earth_death <- get_map("Congo", zoom = 1, maptype = "hybrid")
+ggmap(base_map_earth_death) + 
+  geom_point(data = global_deaths_eliminated,
+             aes(x=Long, y=Lat, color=cases), 
+             size = .01, alpha = .5) + 
+  scale_color_gradient(low = "red", high = "black")
+
+```
+----
+
+The maps above were created in order to try to illustrate the density of the infection and death rate of individuals across the country. Overall they are adequate, but I believe they could use a little more refinement. I am not sure that the red to black gradient reads particularly well on the death map plots, and the labeling is a bit sloppy. I have seen other maps that use county or state information and show the total number of infections in a generall area, and I believe this would be a better representation of the information. Similar to the plots above I think the density of information is too high for a person to easily gain any significant information from the graph. I would like to try and tweak the transparency of the individual data points in a future update to this graph.
+
+----
+````{r session info}
+sessionInfo()
+````
